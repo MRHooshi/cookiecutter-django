@@ -1,0 +1,81 @@
+version: '3'
+
+services:
+  nginx:
+    image: {{cookiecutter.project_slug}}_nginx:1.0
+    build:
+      context: .
+      dockerfile: build/Dockerfile-nginx
+    container_name: {{cookiecutter.project_slug}}_nginx
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - static:/static/
+      - media:/media/
+    depends_on:
+      - web
+
+  db:
+    image: docker.arvancloud.ir/postgres:16-alpine
+    restart: always
+    container_name: {{cookiecutter.project_slug}}_db
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  queue:
+    image: docker.arvancloud.ir/redis:alpine
+    restart: always
+    container_name: {{cookiecutter.project_slug}}_queue
+    volumes:
+      - redis_data:/data
+
+  web: &web
+    image: {{cookiecutter.project_slug}}:1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: ./start-web.sh
+    container_name: {{cookiecutter.project_slug}}_web
+    environment:
+      - DEBUG=False
+      - MEDIA_ROOT=media/
+      - DATABASE_URL=postgres://postgres@db:5432/postgres
+      - REDIS_URL=redis://queue:6379/0
+      - BROKER_URL=redis://queue:6379/0
+      - WEB_WORKERS=2
+      - WEB_THREADS=8
+      - CEELRY_WORKERS=4
+      - FLOWER_BASIC_AUTH=admin:admin
+    volumes:
+      - static:/src/static/
+      - media:/src/media/
+    depends_on:
+      - db
+      - queue
+
+  celeryworker:
+    <<: *web
+    container_name: {{cookiecutter.project_slug}}_celeryworker
+    command: ./start-celery.sh
+
+  celerybeat:
+    <<: *web
+    container_name: {{cookiecutter.project_slug}}_celerybeat
+    command: ./start-celerybeat.sh
+
+  celeryflower:
+    <<: *web
+    container_name: {{cookiecutter.project_slug}}_flower
+    command: ./start-flower.sh
+    ports:
+      - 4000:4000
+
+volumes:
+  postgres_data:
+  redis_data:
+  static:
+  media:
