@@ -11,5 +11,9 @@
         "y",
         "n"
     ],
+    "use_celery": [
+        "y",
+        "n"
+    ],
     "timezone": "UTC"
 }
